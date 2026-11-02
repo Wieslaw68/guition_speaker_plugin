@@ -28,6 +28,7 @@ Konfiguracja odpowiada wariantowi płytki z głośnikiem NS4168. Zwory muszą by
 3. Wybierz ekran **Guition ESP32-S3-4848S040** i zainstaluj plugin.
 4. Po kompilacji sprawdź w Home Assistant integrację ESPHome — urządzenie powinno udostępnić encję odtwarzacza mediów.
 5. W automatyzacjach i usługach TTS używaj encji odtwarzacza przypisanej do tego ekranu.
+6. W Tessera w ustawieniach włącz media (wygaszacz ekranu u mnie działa jako Panel Media Player).
 
 ## Test / ograniczenia
 

@@ -2,7 +2,7 @@ id: guition_speaker
 version: "0.1.0"
 api: "0.24"
 icon: speaker-wireless
-maintainer: local
+maintainer: https://github.com/Wieslaw68/guition_speaker_plugin
 license: AGPL-3.0-only
 stage: beta
 topics:

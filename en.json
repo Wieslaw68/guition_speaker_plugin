@@ -1,7 +1,1 @@
-{
-  "app": {
-    "name": "Guition Speaker",
-    "summary": "Adds mono I2S speaker output and a Home Assistant media player to the Guition ESP32-S3-4848S040.",
-    "description": "Speaker-only audio support for the Guition 4-inch ESP32-S3-4848S040 with the NS4168 amplifier. Adds a Home Assistant media player and mono announcement/TTS playback. No microphone is configured."
-  }
-}
+

@@ -1,0 +1,95 @@
+# Tessera hardware plugin: speaker + Home Assistant media player for Guition 4848S040.
+# NS4168 amplifier is driven as a mono external I2S DAC. No microphone is configured.
+
+substitutions:
+  AUDIO_DOUT_PIN: GPIO40
+  AUDIO_SAMPLE_RATE: "48000"
+  AUDIO_VOLUME_DB_LOW: "-45"
+  AUDIO_VOLUME_DB_HIGH: "0"
+  AUDIO_DAC_DB_AT_0: "-49"
+  AUDIO_DAC_DB_AT_1: "0"
+  BOOT_AUDIO: |-
+    // Keep the mono I2S clock running in silence to avoid a clock-start pop.
+    live_view::bind_speaker(id(ts_media_speaker));
+    id(ts_speaker_out)->set_audio_stream_info(audio::AudioStreamInfo(16, 1, ${AUDIO_SAMPLE_RATE}));
+    id(ts_speaker_out)->start();
+    settings_screen::board_rows.push_back(settings_screen::number(screen_text::txt::settings_media_player,
+        []() -> int32_t { return static_cast<int32_t>(lroundf(id(ts_media_player).volume * 100.0f)); },
+        [](int32_t value) { id(ts_media_player).make_call().set_volume(value / 100.0f).perform(); }, 0, 100, 5, "%"));
+    runtime_tiles::doorbell_audio(id(ts_speaker));
+
+i2s_audio:
+  - id: ts_speaker_bus
+    i2s_bclk_pin: GPIO1
+    i2s_lrclk_pin: GPIO2
+
+speaker:
+  - platform: i2s_audio
+    id: ts_speaker_out
+    i2s_audio_id: ts_speaker_bus
+    i2s_dout_pin: ${AUDIO_DOUT_PIN}
+    dac_type: external
+    sample_rate: ${AUDIO_SAMPLE_RATE}
+    bits_per_sample: 16bit
+    channel: mono
+    buffer_duration: 100ms
+    timeout: never
+
+  # Announcements (including TTS) take priority over music.
+  - platform: mixer
+    id: ts_mixer
+    output_speaker: ts_speaker_out
+    num_channels: 1
+    task_stack_in_psram: true
+    source_speakers:
+      - id: ts_announcement_input
+        buffer_duration: 500ms
+      - id: ts_media_input
+
+  - platform: resampler
+    id: ts_speaker
+    output_speaker: ts_announcement_input
+    task_stack_in_psram: true
+    buffer_duration: 500ms
+
+  - platform: resampler
+    id: ts_media_speaker
+    output_speaker: ts_media_input
+    task_stack_in_psram: true
+
+media_source:
+  - platform: audio_http
+    id: ts_announcement_source
+  - platform: audio_http
+    id: ts_media_source
+
+media_player:
+  - platform: speaker_source
+    id: ts_media_player
+    name: "Media Player"
+    volume_initial: 0.5
+    volume_min: ${ ((AUDIO_VOLUME_DB_LOW | float) - (AUDIO_DAC_DB_AT_0 | float)) / ((AUDIO_DAC_DB_AT_1 | float) - (AUDIO_DAC_DB_AT_0 | float)) }
+    volume_max: ${ ((AUDIO_VOLUME_DB_HIGH | float) - (AUDIO_DAC_DB_AT_0 | float)) / ((AUDIO_DAC_DB_AT_1 | float) - (AUDIO_DAC_DB_AT_0 | float)) }
+    on_play:
+      - lambda: |-
+          audio_owner::Claim claim;
+          claim.role = audio_owner::Role::MEDIA;
+          claim.lost = []() { id(ts_media_player).make_call().set_command(media_player::MEDIA_PLAYER_COMMAND_PAUSE).perform(); };
+          if (!audio_owner::the().claim(audio_owner::Side::OUT, claim))
+            id(ts_media_player).make_call().set_command(media_player::MEDIA_PLAYER_COMMAND_PAUSE).perform();
+    on_pause:
+      - lambda: audio_owner::the().release(audio_owner::Side::OUT, audio_owner::Role::MEDIA);
+    on_idle:
+      - lambda: audio_owner::the().release(audio_owner::Side::OUT, audio_owner::Role::MEDIA);
+    announcement_pipeline:
+      speaker: ts_speaker
+      sources: [ts_announcement_source]
+      format: FLAC
+      sample_rate: ${AUDIO_SAMPLE_RATE}
+      num_channels: 1
+    media_pipeline:
+      speaker: ts_media_speaker
+      sources: [ts_media_source]
+      format: FLAC
+      sample_rate: ${AUDIO_SAMPLE_RATE}
+      num_channels: 1
